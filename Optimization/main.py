@@ -297,7 +297,7 @@ class GA:
 
 
 if __name__ == "__main__":
-    pop_size = 4
+    pop_size = 100
     n = 62
     nA = 4
     p_c = 0.8
