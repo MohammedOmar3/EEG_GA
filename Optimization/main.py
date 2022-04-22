@@ -141,7 +141,11 @@ class GA:
         self.fitness = []  # Population fitness
         self.population = []  # Population
         self.new_population = []  # New Population consisting of Offsprings
-        self.parents = []
+
+        #Performance testing
+        self.best_fitness = float
+        self.active_nA = list()
+        self.all_fitness = list()
 
     def initialization(self):
         '''
@@ -182,20 +186,26 @@ class GA:
                 # Checks what electrodes match up with dataset feature column names.
                 custom.extend([i for (i, z) in enumerate(electrodes) if z == y])
             active_cols.append(custom)
-        # print(active_el)
+        self.active_nA = self.active_nA + active_el
+        print(active_el)
         return active_cols
 
-    def fitness_score(self):
+    def fitness_score(self, bool):
         '''
         Method to work out fitness(accuracy_score) of each chromosome in population
         :return: scores = list of fitness
         '''
         scores = []
-        chromosome = self.active_electrodes(self.population)
+        if bool:
+            chromosome = self.active_electrodes(self.population)
+        elif not bool:
+            chromosome = self.active_electrodes(self.new_population)
         for x in range(len(self.population)):
             logmodel.fit(X_train.iloc[:, chromosome[x]], Y_train)
             predictions = logmodel.predict(X_test.iloc[:, chromosome[x]])
             scores.append(accuracy_score(Y_test, predictions))
+        if bool == True:
+            self.fitness = scores
         return scores
         # scores, population = np.array(scores), np.array(self.population)
         # inds = np.argsort(scores)
@@ -209,6 +219,18 @@ class GA:
             self.fitness.insert(i, dec_number)
         print(self.fitness)
         print("Average Population Fitness: ", aver(self.fitness))
+
+    def performance(self):
+        per_fit = self.all_fitness.copy()
+        per_fit.sort(reverse=True)
+        zipped = zip(self.all_fitness, self.active_nA)
+        sorted2 = sorted(zipped)
+        sorted_list1 = [element for _, element in sorted2]
+        sorted_list1.reverse()
+        average_score = sum(self.all_fitness)/len(self.all_fitness)
+        print("Best Electrode Positioning:", sorted_list1[0], ", with fitness score:", per_fit[0])
+        print("Average accuracy score:", average_score)
+        self.active_nA.clear()
 
     def crossover(self, chr1, chr2):
         cr1, cr2 = chr1.copy(), chr2.copy()
@@ -256,18 +278,22 @@ class GA:
 
     def evolve(self):
         idx = self.rws(2)
+        offspring = list()
         for x in range(0, len(idx)):
             prob = np.random.rand()
-            # print(prob)
-            if np.random.rand() < self.p_c:
-                offspring = self.crossover(self.population[idx[x][0]], self.population[idx[x][1]])
-                # print("done crossover")
+            if prob < self.p_c:
+                # print("Crossover has happened")
+                tmp = self.crossover(self.population[idx[x][0]], self.population[idx[x][1]])
                 if np.random.rand() < self.p_m:
-                    self.mutate(offspring[0])
-                    self.mutate(offspring[1])
-                    # print("done mutate")
-                for y in range(0, len(offspring)):
-                    self.new_population.append(offspring[y])
+                    self.mutate(tmp[0])
+                    self.mutate(tmp[1])
+                for y in range(0, len(tmp)):
+                    offspring.append(tmp[y])
+            elif prob > self.p_c:
+                # print("crossover has not happened")
+                offspring.append(self.population[idx[x][0]])
+                offspring.append(self.population[idx[x][1]])
+        self.new_population = offspring
 
     def selection(self):
         # do fitness score for new population and old population and combine the the two fitness,
@@ -276,31 +302,26 @@ class GA:
         for x in range(len(self.new_population)):
             pop2.append(self.new_population[x])
         # fitness of new population
-        scores = self.fitness_score()
+        scores = self.fitness_score(bool=False)
+        # fitness of both populations combined
         scores2 = fit2 + scores
+        self.all_fitness = scores2
         # add scores to self.fitness
-        print(scores2)
+        print(scores)
         # arrange the
         zipped = zip(scores2, pop2)
         sorted2 = sorted(zipped)
         sorted_list1 = [element for _, element in sorted2]
-        print(type(sorted_list1))
-        # sorted_list2 = list(OrderedDict.fromkeys(sorted_list1))
+        sorted_list1.reverse()
         self.population = sorted_list1[:self.pop_size]
         self.new_population.clear()
-        print(self.population)
-        print(len(self.population))
-        print(len(self.population[0]))
-        print(len(self.population[1]))
-        print(len(self.population[2]))
-        print(len(self.population[3]))
 
 
 if __name__ == "__main__":
     pop_size = 100
     n = 62
     nA = 4
-    p_c = 0.8
+    p_c = 1
     p_m = 0.02
     g = 5
 
@@ -308,19 +329,14 @@ if __name__ == "__main__":
     X_train, X_test, Y_train, Y_test = split(data_bc, label_bc)
     logmodel = RandomForestClassifier(n_estimators=200, random_state=0)
     pop.initialization()
-    # active_cols = pop.active_electrodes()
-    # df = data_bc.iloc[:, active_cols[0]]
-    # print(df)
-    # df.to_csv('example2')
 
     for x in range(g):
         print("Generation: ", x)
         # pop.evaluation()
-        pop.fitness = pop.fitness_score()
+        pop.fitness_score(bool=True)
         print(pop.fitness)
-        pop.active_electrodes(pop.population)
+        # pop.active_electrodes(pop.population)
         pop.evolve()
         pop.selection()
+        pop.performance()
         print()
-    print("Final Evaluation")
-    pop.evaluation()
