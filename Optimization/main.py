@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import re
+import sys
 from pathlib import Path
 import csv
 import pandas as pd
@@ -18,6 +19,8 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import KFold, cross_val_score
 
 from sklearn.model_selection import train_test_split
+
+# sys.stdout = open('output.txt','wt')  # Prints out output from running code to a txt file
 
 data_bc = pd.read_csv('datasets.csv')
 label_bc = data_bc["Label"]
@@ -43,23 +46,6 @@ def split(df, label):
     return X_tr, X_te, Y_tr, Y_te
 
 
-def acc_score(df, label):
-    Score = pd.DataFrame({"Classifier": classifiers})
-    j = 0
-    acc = []
-    X_train, X_test, Y_train, Y_test = split(df, label)
-    for i in models:
-        model = i
-        model.fit(X_train, Y_train)
-        predictions = model.predict(X_test)
-        acc.append(accuracy_score(Y_test, predictions))
-        j = j + 1
-    Score["Accuracy"] = acc
-    Score.sort_values(by="Accuracy", ascending=False, inplace=True)
-    Score.reset_index(drop=True, inplace=True)
-    return Score
-
-
 def plot(score, x, y, c="b"):
     gen = [1, 2, 3, 4, 5]
     plt.figure(figsize=(6, 4))
@@ -73,32 +59,6 @@ def swap(l1, l2, a):
     l1[a], l2[a] = l2[a], l1[a]
 
 
-def function(individual):
-    # turns chromosome binary into decimal
-    str1 = ''.join(str(e) for e in individual)
-    dec_number = int(str1, 2)
-    # returns decimal number
-    return dec_number
-
-
-def fit(pop):
-    # Works out decimal value of a binary
-    tmpfit = list()
-    for i in range(len(pop)):
-        str1 = ''.join(str(e) for e in pop[i])
-        dec_number = int(str1, 2)
-        tmpfit.insert(i, dec_number)
-    return tmpfit
-
-
-def aver(fitness):
-    # Returns average fitness in population
-    sum = 0
-    for x in range(len(fitness)):
-        sum = sum + fitness[x]
-    return sum / len(fitness)
-
-
 def fill_electrodes():
     # Returns electrode index for feature in dataset, [0-61, 0-61]
     headers = data_bc.columns.values
@@ -107,17 +67,6 @@ def fill_electrodes():
         electrodes.append(int(re.sub('.*?([0-9]*)$', r'\1', headers[x])))
     electrodes.append(headers[len(headers) - 1])
     return electrodes
-
-
-def col_checker(active_electrodes):
-    # Returns the number of active columns for population
-    i = 0
-    electrodes = fill_electrodes()
-    print(len(electrodes))
-    for x in range(len(electrodes)):
-        if electrodes[x] in active_electrodes:
-            i = i + 1
-    print(i)
 
 
 class GA:
@@ -139,19 +88,20 @@ class GA:
         self.p_c = p_c
         self.p_m = p_m
         self.fitness = []  # Population fitness
+        self.new_fitness = []  # Population fitness
         self.population = []  # Population
         self.new_population = []  # New Population consisting of Offsprings
 
-        #Performance testing
+        #Variables for performance testing
         self.best_fitness = float
         self.active_nA = list()
         self.all_fitness = list()
 
     def initialization(self):
-        '''
+        """
         Method generates a population of chromosomes with N: electrodes and nA: active electrodes.
         :return: Populates self.population
-        '''
+        """
         for y in range(0, self.pop_size):
             cr = [random.randint(0, 0) for x in range(self.n)]
             options = np.random.choice(self.n, self.nA, replace=False)
@@ -204,33 +154,10 @@ class GA:
             logmodel.fit(X_train.iloc[:, chromosome[x]], Y_train)
             predictions = logmodel.predict(X_test.iloc[:, chromosome[x]])
             scores.append(accuracy_score(Y_test, predictions))
-        if bool == True:
+        if bool:
             self.fitness = scores
-        return scores
-        # scores, population = np.array(scores), np.array(self.population)
-        # inds = np.argsort(scores)
-        # return list(scores[inds][::-1]), list(population[inds, :][::-1])
-
-    def evaluation(self):
-        self.fitness.clear()
-        for i in range(self.pop_size):
-            str1 = ''.join(str(e) for e in self.population[i])
-            dec_number = int(str1, 2)
-            self.fitness.insert(i, dec_number)
-        print(self.fitness)
-        print("Average Population Fitness: ", aver(self.fitness))
-
-    def performance(self):
-        per_fit = self.all_fitness.copy()
-        per_fit.sort(reverse=True)
-        zipped = zip(self.all_fitness, self.active_nA)
-        sorted2 = sorted(zipped)
-        sorted_list1 = [element for _, element in sorted2]
-        sorted_list1.reverse()
-        average_score = sum(self.all_fitness)/len(self.all_fitness)
-        print("Best Electrode Positioning:", sorted_list1[0], ", with fitness score:", per_fit[0])
-        print("Average accuracy score:", average_score)
-        self.active_nA.clear()
+        elif not bool:
+            return scores
 
     def crossover(self, chr1, chr2):
         cr1, cr2 = chr1.copy(), chr2.copy()
@@ -240,7 +167,8 @@ class GA:
             if cr1[x] != cr2[x]:
                 # print("valid")
                 allactive.append(x)
-        # If chromosome doesn't have more than 2 electrodes it can swap, don't crossover
+        # If chromosome doesn't have more than 2 active electrodes it can swap, don't do crossover and leave it how
+        # it is
         if len(allactive) > 2:
             while not done:
                 active = random.sample(allactive, 2)
@@ -263,11 +191,11 @@ class GA:
         p1[i], p1[j] = p1[j], p1[i]
 
     def rws(self, n):
-        '''
+        """
         Roulette Wheel Selection
         :param n:
         :return:
-        '''
+        """
         pairs = []
         total_fitness = float(sum(self.fitness))
         rel_fitness = [f / total_fitness for f in self.fitness]
@@ -296,34 +224,53 @@ class GA:
         self.new_population = offspring
 
     def selection(self):
-        # do fitness score for new population and old population and combine the the two fitness,
-        pop2 = self.population.copy()
-        fit2 = self.fitness.copy()
+        # combines both previous population and new population into a single list
+        total_pop = self.population.copy()
         for x in range(len(self.new_population)):
-            pop2.append(self.new_population[x])
-        # fitness of new population
-        scores = self.fitness_score(bool=False)
-        # fitness of both populations combined
-        scores2 = fit2 + scores
-        self.all_fitness = scores2
-        # add scores to self.fitness
-        print(scores)
-        # arrange the
-        zipped = zip(scores2, pop2)
+            total_pop.append(self.new_population[x])
+
+        # combines both previous fitness and new fitness into a single list
+        previous_fitness = self.fitness.copy()
+        new_fitness = self.fitness_score(bool=False)
+        print(new_fitness)
+        total_fitness = previous_fitness + new_fitness
+        self.all_fitness = total_fitness
+
+        zipped = zip(total_fitness, total_pop)  # Links both total_fitness and total_pop together in regards to index
+        sorted2 = sorted(zipped)
+        sorted_list1 = [element for _, element in sorted2]  # Sorts zipped based on fitness values of each chromosome
+        # in the population
+        sorted_list1.reverse() # Arranges new population from the chromosome with highest fitness to lowest
+
+        # Takes the top half of the combined population with the highest fitness values.
+        self.population = sorted_list1[:self.pop_size]
+        # Clears new_population for the next generation iteration.
+        self.new_population.clear()
+
+    def performance(self):
+        """
+
+        :return:
+        """
+        per_fit = self.all_fitness.copy()
+        per_fit.sort(reverse=True)
+        zipped = zip(self.all_fitness, self.active_nA)
         sorted2 = sorted(zipped)
         sorted_list1 = [element for _, element in sorted2]
         sorted_list1.reverse()
-        self.population = sorted_list1[:self.pop_size]
-        self.new_population.clear()
+        average_score = sum(self.all_fitness)/len(self.all_fitness)
+        print("Best Electrode Positioning:", sorted_list1[0], ", with fitness score:", per_fit[0])
+        print("Average accuracy score:", average_score)
+        self.active_nA.clear()
 
 
 if __name__ == "__main__":
-    pop_size = 100
+    pop_size = 6
     n = 62
     nA = 4
-    p_c = 1
+    p_c = 0.8
     p_m = 0.02
-    g = 5
+    g = 30
 
     pop = GA(pop_size=pop_size, n=n, nA=nA, p_c=p_c, p_m=p_m)
     X_train, X_test, Y_train, Y_test = split(data_bc, label_bc)
@@ -332,10 +279,8 @@ if __name__ == "__main__":
 
     for x in range(g):
         print("Generation: ", x)
-        # pop.evaluation()
         pop.fitness_score(bool=True)
         print(pop.fitness)
-        # pop.active_electrodes(pop.population)
         pop.evolve()
         pop.selection()
         pop.performance()
