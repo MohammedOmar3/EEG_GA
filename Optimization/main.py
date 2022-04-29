@@ -17,12 +17,12 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn import metrics
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import KFold, cross_val_score
-
+import pickle
 from sklearn.model_selection import train_test_split
 
 # sys.stdout = open('output.txt','wt')  # Prints out output from running code to a txt file
 
-data_bc = pd.read_csv('datasets.csv')
+data_bc = pd.read_csv('train_test.csv')
 label_bc = data_bc["Label"]
 
 classifiers = ['LinearSVM', 'RadialSVM',
@@ -92,7 +92,7 @@ class GA:
         self.population = []  # Population
         self.new_population = []  # New Population consisting of Offsprings
 
-        #Variables for performance testing
+        # Variables for performance testing
         self.best_fitness = float
         self.active_nA = list()
         self.all_fitness = list()
@@ -265,7 +265,7 @@ class GA:
 
 
 if __name__ == "__main__":
-    pop_size = 6
+    pop_size = 100
     n = 62
     nA = 4
     p_c = 0.8
@@ -285,3 +285,12 @@ if __name__ == "__main__":
         pop.selection()
         pop.performance()
         print()
+
+    # Save Model.
+    filename = 'finalized_model.sav'
+    pickle.dump(logmodel, open(filename, 'wb'))
+
+    # Load Model
+    # loaded_model = pickle.load(open(filename, 'rb'))
+    # result = loaded_model.score(X_test, Y_test)
+    # print(result)
