@@ -240,6 +240,11 @@ class GA:
         sorted2 = sorted(zipped)
         sorted_list1 = [element for _, element in sorted2]  # Sorts zipped based on fitness values of each chromosome
         # in the population
+        
+        # Removes Duplicates from total population
+        final_list = list(k for k,_ in itertools.groupby(sorted_list1))
+        sorted_list1 = final_list
+        
         sorted_list1.reverse() # Arranges new population from the chromosome with highest fitness to lowest
 
         # Takes the top half of the combined population with the highest fitness values.
